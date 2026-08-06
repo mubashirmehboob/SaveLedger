@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to verify user authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the caller owns the document via UID
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper function to check document ownership via userId field
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                    request.resource.data.id == userId;
+
+      allow update: if isOwner(userId) &&
+                    request.resource.data.id == userId &&
+                    (!('role' in resource.data) || request.resource.data.role == resource.data.role);
+
+      allow delete: if isOwner(userId);
+    }
+
+    // 2. Ledgers Collection
+    match /ledgers/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 3. Transactions Collection
+    match /transactions/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 4. Repayments Collection
+    match /repayments/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 5. Events Collection
+    match /events/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 6. Event Items Collection
+    match /eventItems/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 7. Expense Books Collection
+    match /expenseBooks/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 8. Expenses Collection
+    match /expenses/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 9. Deleted Ledgers Collection
+    match /deleted_ledgers/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 10. Deleted Events Collection
+    match /deleted_events/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+    // 11. Settings Collection
+    match /settings/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                    request.resource.data.userId == userId;
+      allow update: if isOwner(userId) &&
+                    request.resource.data.userId == userId &&
+                    resource.data.userId == userId;
+    }
+
+    // 12. Custom Contacts Collection
+    match /contacts/{docId} {
+      allow read, delete: if isDocOwner();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId;
+    }
+
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "mobile": { "type": "string" },
+        "avatar": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "createdAt"]
+    },
+    "Ledger": {
+      "title": "Ledger",
+      "description": "Customer custom ledger notebook directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Ledger entry transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ledgerId": { "type": "string" },
+        "userId": { "type": "string" },
+        "personName": { "type": "string" },
+        "personMobile": { "type": "string" },
+        "personWhatsApp": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string" },
+        "nature": { "type": "string" },
+        "itemDetails": { "type": "string" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "ledgerId", "userId", "personName", "amount", "type", "nature", "date"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Ceremony event diary registry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "plannedBudget": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "type", "date", "plannedBudget"]
+    },
+    "EventItem": {
+      "title": "EventItem",
+      "description": "Item of gift received or expense spent inside event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventId": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "personName": { "type": "string" },
+        "personMobile": { "type": "string" },
+        "personWhatsApp": { "type": "string" },
+        "amount": { "type": "number" },
+        "giftItem": { "type": "string" },
+        "expenseCategory": { "type": "string" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "eventId", "userId", "type", "amount", "date"]
+    },
+    "ExpenseBook": {
+      "title": "ExpenseBook",
+      "description": "Monthly expense book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "monthYear": { "type": "string" },
+        "name": { "type": "string" },
+        "monthlyIncome": { "type": "number" },
+        "openingBalance": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "monthYear", "name", "monthlyIncome", "openingBalance", "createdAt"]
+    },
+    "ExpenseEntry": {
+      "title": "ExpenseEntry",
+      "description": "Expense entry logged inside a monthly book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bookId": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "bookId", "userId", "date", "category", "description", "amount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "User profiles"
+    },
+    "/ledgers/{ledgerId}": {
+      "schema": "Ledger",
+      "description": "Custom customer loan books"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Loan timeline transactions"
+    },
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Ceremony planner registry cards"
+    },
+    "/eventItems/{itemId}": {
+      "schema": "EventItem",
+      "description": "Guest gift details and vendor payments"
+    },
+    "/expenseBooks/{bookId}": {
+      "schema": "ExpenseBook",
+      "description": "Monthly budget portfolios"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "ExpenseEntry",
+      "description": "Granular day-to-day individual expenses"
+    }
+  }
+}

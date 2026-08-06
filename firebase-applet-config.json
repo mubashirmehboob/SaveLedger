@@ -1,0 +1,10 @@
+{
+  "projectId": "save-ledger",
+  "appId": "1:405840338853:web:ecf3df07fc84c6563f524c",
+  "apiKey": "AIzaSyA7Ad-XkHLqYAtya6yR6_ByqVCpJgFtTbM",
+  "authDomain": "save-ledger.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "save-ledger.firebasestorage.app",
+  "messagingSenderId": "405840338853",
+  "measurementId": ""
+}

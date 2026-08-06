@@ -1,0 +1,6 @@
+{
+  "name": "SaveLedger",
+  "description": "SaveLedger helps you manage loans, track daily expenses, organize event records, and securely sync your financial data across devices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
