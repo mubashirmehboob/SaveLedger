@@ -97,7 +97,7 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       setProfileName(currentUser.name || '');
-      setProfileEmail(currentUser.email ? 'user@example.com' : '');
+      setProfileEmail(currentUser.email || '');
       setProfileMobile(currentUser.mobile || '');
     }
   }, [currentUser]);
@@ -1307,7 +1307,6 @@ export default function App() {
               <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center font-black text-white text-lg">S</div>
               <div>
                 <h1 className="text-lg font-bold tracking-tight leading-none text-white">Save Ledger</h1>
-                <span className="text-[9px] text-slate-400 font-mono tracking-widest uppercase mt-0.5 block">Premium Ledger</span>
               </div>
             </div>
 
@@ -1518,11 +1517,13 @@ export default function App() {
                   <div className="truncate space-y-0.5">
                     <p className="text-xs font-bold text-white truncate leading-tight">{currentUser.name}</p>
                     <p className="text-[10px] text-slate-300 font-mono truncate leading-tight">
-                      user@example.com
+                      {currentUser.email || 'No email registered'}
                     </p>
-                    <p className="text-[10px] text-emerald-400 font-mono truncate leading-tight">
-                      {currentUser.mobile || '+92 300 1122334'}
-                    </p>
+                    {currentUser.mobile && (
+                      <p className="text-[10px] text-emerald-400 font-mono truncate leading-tight">
+                        {currentUser.mobile}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button
@@ -1541,14 +1542,13 @@ export default function App() {
             
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between shrink-0 sticky top-0 z-30">
-              <div className="hidden sm:flex items-center text-xs text-slate-500 font-bold gap-1.5 bg-slate-50 px-3.5 py-2 rounded-full border border-slate-200 truncate max-w-xs sm:max-w-md">
+              <div className="flex items-center text-[10px] sm:text-xs text-slate-600 font-bold gap-1.5 bg-slate-50 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full border border-slate-200/80 truncate max-w-[170px] xs:max-w-[220px] sm:max-w-md">
                 <span className="truncate">{texts.liveSandboxBanner}</span>
               </div>
 
               <div className="flex items-center gap-4">
                 {/* Language Selector */}
                 <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1.5 shadow-3xs font-bold">
-                  <span className="text-[10px] text-slate-400 font-black hidden md:inline">Lang:</span>
                   <select
                     value={language}
                     onChange={(e) => {
@@ -1562,19 +1562,6 @@ export default function App() {
                     <option value="urdu">🇵🇰 اردو</option>
                     <option value="hindi">🇮🇳 हिन्दी</option>
                   </select>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-xs font-bold text-slate-800 truncate max-w-[120px] sm:max-w-[200px]">{currentUser.name}</div>
-                  <div className="text-[10px] text-slate-500 font-mono truncate max-w-[120px] sm:max-w-[200px]">
-                    {currentUser.email ? 'user@example.com' : (currentUser.mobile || 'user@example.com')}
-                  </div>
-                </div>
-                
-                <div className="relative">
-                  <div className="w-9 h-9 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full flex items-center justify-center font-extrabold text-sm select-none">
-                    {currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                  </div>
                 </div>
               </div>
             </header>

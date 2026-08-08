@@ -248,7 +248,7 @@ export default function Dashboard({
       {/* Main Tab Controller (Only My Ledgers and Events inside card body) */}
       <div className="bg-white border border-slate-200 text-slate-800 rounded-3xl p-6 shadow-xs relative overflow-hidden" id="dashboard-total-card">
 
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-5 border-b border-slate-100">
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-0 border-b border-white">
           <div>
             <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">{texts.aggregatesBannerTitle}</span>
             <div className="flex flex-wrap items-center gap-2 mt-1">
