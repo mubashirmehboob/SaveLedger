@@ -514,31 +514,48 @@ export default function App() {
     localStorage.removeItem('trustbook_current_user');
   };
 
+  // Helper to get active user ID for cloud operations
+  const getActiveUserId = () => {
+    return auth.currentUser ? auth.currentUser.uid : currentUser?.id || 'u1';
+  };
+
+  // Helper to check if Firestore sync should run
+  const shouldSyncToCloud = () => {
+    return !!auth.currentUser && !!currentUser && auth.currentUser.uid === currentUser.id && !currentUser.id.startsWith('u1');
+  };
+
   // Ledger actions
   const handleAddLedger = async (name: string, description: string) => {
     if (!currentUser) return;
+    const activeUid = getActiveUserId();
     const newLedger: Ledger = {
       id: 'l_' + Date.now(),
-      userId: currentUser.id,
+      userId: activeUid,
       name,
       description: description || undefined,
       createdAt: new Date().toISOString()
     };
     
-    if (currentUser.id === 'u1') {
-      saveLedgers([...ledgers, newLedger]);
-    } else {
-      await setDoc(doc(db, 'ledgers', newLedger.id), cleanUndefined(newLedger));
+    // Always update local state immediately for instant UI response
+    saveLedgers([newLedger, ...ledgers]);
+
+    // Sync to Firestore if signed in
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'ledgers', newLedger.id), cleanUndefined(newLedger));
+      } catch (err) {
+        console.warn("Cloud ledger sync notice:", err);
+      }
     }
   };
 
   const handleDeleteLedger = async (id: string) => {
     const targetLedger = ledgers.find(l => l.id === id);
-    if (!targetLedger) return;
+    if (!targetLedger || !currentUser) return;
 
     const associatedTx = transactions.filter(t => t.ledgerId === id);
+    const activeUid = getActiveUserId();
     
-    // Add to DeletedLedgers
     const newDeletedLedger: DeletedLedger = {
       id: 'del_l_' + Date.now(),
       ledger: targetLedger,
@@ -546,19 +563,23 @@ export default function App() {
       deletedAt: new Date().toISOString()
     };
     
-    if (currentUser?.id === 'u1') {
-      saveDeletedLedgers([...deletedLedgers, newDeletedLedger]);
-      saveLedgers(ledgers.filter(l => l.id !== id));
-      saveTransactions(transactions.filter(t => t.ledgerId !== id));
-    } else {
-      // Write to Firestore collections (including repayments synchronization)
-      await setDoc(doc(db, 'deleted_ledgers', newDeletedLedger.id), cleanUndefined({ ...newDeletedLedger, userId: currentUser?.id }));
-      await deleteDoc(doc(db, 'ledgers', id));
-      for (const t of associatedTx) {
-        await deleteDoc(doc(db, 'transactions', t.id));
-        if (t.type === 'Return') {
-          await deleteDoc(doc(db, 'repayments', t.id));
+    // Always update local state immediately
+    saveDeletedLedgers([newDeletedLedger, ...deletedLedgers]);
+    saveLedgers(ledgers.filter(l => l.id !== id));
+    saveTransactions(transactions.filter(t => t.ledgerId !== id));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'deleted_ledgers', newDeletedLedger.id), cleanUndefined({ ...newDeletedLedger, userId: activeUid }));
+        await deleteDoc(doc(db, 'ledgers', id));
+        for (const t of associatedTx) {
+          await deleteDoc(doc(db, 'transactions', t.id));
+          if (t.type === 'Return') {
+            await deleteDoc(doc(db, 'repayments', t.id));
+          }
         }
+      } catch (err) {
+        console.warn("Cloud ledger delete notice:", err);
       }
     }
 
@@ -567,89 +588,113 @@ export default function App() {
 
   const handleRestoreLedger = async (deletedId: string) => {
     const record = deletedLedgers.find(dl => dl.id === deletedId);
-    if (!record) return;
+    if (!record || !currentUser) return;
 
-    if (currentUser?.id === 'u1') {
-      saveLedgers([...ledgers, record.ledger]);
-      saveTransactions([...transactions, ...record.associatedTransactions]);
-      saveDeletedLedgers(deletedLedgers.filter(dl => dl.id !== deletedId));
-    } else {
-      await setDoc(doc(db, 'ledgers', record.ledger.id), cleanUndefined(record.ledger));
-      for (const t of record.associatedTransactions) {
-        await setDoc(doc(db, 'transactions', t.id), cleanUndefined(t));
-        if (t.type === 'Return') {
-          await setDoc(doc(db, 'repayments', t.id), cleanUndefined(t));
+    // Always update local state immediately
+    saveLedgers([record.ledger, ...ledgers]);
+    saveTransactions([...record.associatedTransactions, ...transactions]);
+    saveDeletedLedgers(deletedLedgers.filter(dl => dl.id !== deletedId));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'ledgers', record.ledger.id), cleanUndefined(record.ledger));
+        for (const t of record.associatedTransactions) {
+          await setDoc(doc(db, 'transactions', t.id), cleanUndefined(t));
+          if (t.type === 'Return') {
+            await setDoc(doc(db, 'repayments', t.id), cleanUndefined(t));
+          }
         }
+        await deleteDoc(doc(db, 'deleted_ledgers', deletedId));
+      } catch (err) {
+        console.warn("Cloud ledger restore notice:", err);
       }
-      await deleteDoc(doc(db, 'deleted_ledgers', deletedId));
     }
   };
 
   const handlePermanentDeleteLedger = async (deletedId: string) => {
-    if (currentUser?.id === 'u1') {
-      saveDeletedLedgers(deletedLedgers.filter(dl => dl.id !== deletedId));
-    } else {
-      await deleteDoc(doc(db, 'deleted_ledgers', deletedId));
+    saveDeletedLedgers(deletedLedgers.filter(dl => dl.id !== deletedId));
+    if (shouldSyncToCloud()) {
+      try {
+        await deleteDoc(doc(db, 'deleted_ledgers', deletedId));
+      } catch (err) {
+        console.warn("Cloud permanent delete notice:", err);
+      }
     }
   };
 
   // Transaction actions within a ledger
   const handleAddTransaction = async (newTxData: Omit<Transaction, 'id' | 'ledgerId' | 'userId'>) => {
     if (!currentUser || !selectedLedger) return;
+    const activeUid = getActiveUserId();
     const newTx: Transaction = {
       ...newTxData,
       id: 'tx_' + Date.now(),
       ledgerId: selectedLedger.id,
-      userId: currentUser.id
+      userId: activeUid
     };
     
-    if (currentUser.id === 'u1') {
-      saveTransactions([...transactions, newTx]);
-    } else {
-      await setDoc(doc(db, 'transactions', newTx.id), cleanUndefined(newTx));
-      if (newTx.type === 'Return') {
-        await setDoc(doc(db, 'repayments', newTx.id), cleanUndefined(newTx));
+    // Always update local state
+    saveTransactions([newTx, ...transactions]);
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'transactions', newTx.id), cleanUndefined(newTx));
+        if (newTx.type === 'Return') {
+          await setDoc(doc(db, 'repayments', newTx.id), cleanUndefined(newTx));
+        }
+      } catch (err) {
+        console.warn("Cloud transaction sync notice:", err);
       }
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
     const targetTx = transactions.find(t => t.id === id);
-    if (currentUser?.id === 'u1') {
-      saveTransactions(transactions.filter(t => t.id !== id));
-    } else {
-      await deleteDoc(doc(db, 'transactions', id));
-      if (targetTx?.type === 'Return') {
-        await deleteDoc(doc(db, 'repayments', id));
+    saveTransactions(transactions.filter(t => t.id !== id));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await deleteDoc(doc(db, 'transactions', id));
+        if (targetTx?.type === 'Return') {
+          await deleteDoc(doc(db, 'repayments', id));
+        }
+      } catch (err) {
+        console.warn("Cloud transaction delete notice:", err);
       }
     }
   };
 
   const handleDeletePersonTransactions = async (personName: string, ledgerId: string) => {
     const matched = transactions.filter(t => t.personName.trim().toLowerCase() === personName.trim().toLowerCase() && t.ledgerId === ledgerId);
-    
-    if (currentUser?.id === 'u1') {
-      saveTransactions(transactions.filter(t => !(t.personName.trim().toLowerCase() === personName.trim().toLowerCase() && t.ledgerId === ledgerId)));
-    } else {
-      for (const t of matched) {
-        await deleteDoc(doc(db, 'transactions', t.id));
-        if (t.type === 'Return') {
-          await deleteDoc(doc(db, 'repayments', t.id));
+    saveTransactions(transactions.filter(t => !(t.personName.trim().toLowerCase() === personName.trim().toLowerCase() && t.ledgerId === ledgerId)));
+
+    if (shouldSyncToCloud()) {
+      try {
+        for (const t of matched) {
+          await deleteDoc(doc(db, 'transactions', t.id));
+          if (t.type === 'Return') {
+            await deleteDoc(doc(db, 'repayments', t.id));
+          }
         }
+      } catch (err) {
+        console.warn("Cloud delete person transactions notice:", err);
       }
     }
   };
 
   const handleUpdateTransaction = async (updatedTx: Transaction) => {
-    if (currentUser?.id === 'u1') {
-      saveTransactions(transactions.map(t => t.id === updatedTx.id ? updatedTx : t));
-    } else {
-      await setDoc(doc(db, 'transactions', updatedTx.id), cleanUndefined(updatedTx));
-      if (updatedTx.type === 'Return') {
-        await setDoc(doc(db, 'repayments', updatedTx.id), cleanUndefined(updatedTx));
-      } else {
-        // If type changed from return to else, clean up from repayment collection
-        await deleteDoc(doc(db, 'repayments', updatedTx.id));
+    saveTransactions(transactions.map(t => t.id === updatedTx.id ? updatedTx : t));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'transactions', updatedTx.id), cleanUndefined(updatedTx));
+        if (updatedTx.type === 'Return') {
+          await setDoc(doc(db, 'repayments', updatedTx.id), cleanUndefined(updatedTx));
+        } else {
+          await deleteDoc(doc(db, 'repayments', updatedTx.id));
+        }
+      } catch (err) {
+        console.warn("Cloud transaction update notice:", err);
       }
     }
   };
@@ -657,24 +702,31 @@ export default function App() {
   // Event actions
   const handleAddEvent = async (newEventData: Omit<EventEntity, 'id' | 'userId'>) => {
     if (!currentUser) return;
+    const activeUid = getActiveUserId();
     const newEvent: EventEntity = {
       ...newEventData,
       id: 'e_' + Date.now(),
-      userId: currentUser.id
+      userId: activeUid
     };
     
-    if (currentUser.id === 'u1') {
-      saveEvents([...events, newEvent]);
-    } else {
-      await setDoc(doc(db, 'events', newEvent.id), cleanUndefined(newEvent));
+    // Always update local state immediately
+    saveEvents([newEvent, ...events]);
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'events', newEvent.id), cleanUndefined(newEvent));
+      } catch (err) {
+        console.warn("Cloud event sync notice:", err);
+      }
     }
   };
 
   const handleDeleteEvent = async (id: string) => {
     const targetEvent = events.find(e => e.id === id);
-    if (!targetEvent) return;
+    if (!targetEvent || !currentUser) return;
 
     const associatedItems = eventItems.filter(item => item.eventId === id);
+    const activeUid = getActiveUserId();
 
     const newDeletedEvent: DeletedEvent = {
       id: 'del_e_' + Date.now(),
@@ -683,15 +735,20 @@ export default function App() {
       deletedAt: new Date().toISOString()
     };
 
-    if (currentUser?.id === 'u1') {
-      saveDeletedEvents([...deletedEvents, newDeletedEvent]);
-      saveEvents(events.filter(e => e.id !== id));
-      saveEventItems(eventItems.filter(item => item.eventId !== id));
-    } else {
-      await setDoc(doc(db, 'deleted_events', newDeletedEvent.id), cleanUndefined({ ...newDeletedEvent, userId: currentUser?.id }));
-      await deleteDoc(doc(db, 'events', id));
-      for (const item of associatedItems) {
-        await deleteDoc(doc(db, 'eventItems', item.id));
+    // Always update local state immediately
+    saveDeletedEvents([newDeletedEvent, ...deletedEvents]);
+    saveEvents(events.filter(e => e.id !== id));
+    saveEventItems(eventItems.filter(item => item.eventId !== id));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'deleted_events', newDeletedEvent.id), cleanUndefined({ ...newDeletedEvent, userId: activeUid }));
+        await deleteDoc(doc(db, 'events', id));
+        for (const item of associatedItems) {
+          await deleteDoc(doc(db, 'eventItems', item.id));
+        }
+      } catch (err) {
+        console.warn("Cloud event delete notice:", err);
       }
     }
 
@@ -700,26 +757,34 @@ export default function App() {
 
   const handleRestoreEvent = async (deletedId: string) => {
     const record = deletedEvents.find(de => de.id === deletedId);
-    if (!record) return;
+    if (!record || !currentUser) return;
 
-    if (currentUser?.id === 'u1') {
-      saveEvents([...events, record.event]);
-      saveEventItems([...eventItems, ...record.associatedEventItems]);
-      saveDeletedEvents(deletedEvents.filter(de => de.id !== deletedId));
-    } else {
-      await setDoc(doc(db, 'events', record.event.id), cleanUndefined(record.event));
-      for (const item of record.associatedEventItems) {
-        await setDoc(doc(db, 'eventItems', item.id), cleanUndefined(item));
+    // Always update local state immediately
+    saveEvents([record.event, ...events]);
+    saveEventItems([...record.associatedEventItems, ...eventItems]);
+    saveDeletedEvents(deletedEvents.filter(de => de.id !== deletedId));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'events', record.event.id), cleanUndefined(record.event));
+        for (const item of record.associatedEventItems) {
+          await setDoc(doc(db, 'eventItems', item.id), cleanUndefined(item));
+        }
+        await deleteDoc(doc(db, 'deleted_events', deletedId));
+      } catch (err) {
+        console.warn("Cloud event restore notice:", err);
       }
-      await deleteDoc(doc(db, 'deleted_events', deletedId));
     }
   };
 
   const handlePermanentDeleteEvent = async (deletedId: string) => {
-    if (currentUser?.id === 'u1') {
-      saveDeletedEvents(deletedEvents.filter(de => de.id !== deletedId));
-    } else {
-      await deleteDoc(doc(db, 'deleted_events', deletedId));
+    saveDeletedEvents(deletedEvents.filter(de => de.id !== deletedId));
+    if (shouldSyncToCloud()) {
+      try {
+        await deleteDoc(doc(db, 'deleted_events', deletedId));
+      } catch (err) {
+        console.warn("Cloud permanent delete event notice:", err);
+      }
     }
   };
 
@@ -778,112 +843,146 @@ export default function App() {
   // Event Item Actions (Gifts / contribution vs Expenses spent out)
   const handleAddEventItem = async (newItemData: Omit<EventItem, 'id' | 'eventId' | 'userId'>) => {
     if (!currentUser || !selectedEvent) return;
+    const activeUid = getActiveUserId();
     const newItem: EventItem = {
       ...newItemData,
       id: 'ei_' + Date.now(),
       eventId: selectedEvent.id,
-      userId: currentUser.id
+      userId: activeUid
     };
     
-    if (currentUser.id === 'u1') {
-      saveEventItems([...eventItems, newItem]);
-    } else {
-      await setDoc(doc(db, 'eventItems', newItem.id), cleanUndefined(newItem));
+    saveEventItems([newItem, ...eventItems]);
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'eventItems', newItem.id), cleanUndefined(newItem));
+      } catch (err) {
+        console.warn("Cloud event item sync notice:", err);
+      }
     }
   };
 
   const handleDeleteEventItem = async (id: string) => {
-    if (currentUser?.id === 'u1') {
-      saveEventItems(eventItems.filter(item => item.id !== id));
-    } else {
-      await deleteDoc(doc(db, 'eventItems', id));
+    saveEventItems(eventItems.filter(item => item.id !== id));
+    if (shouldSyncToCloud()) {
+      try {
+        await deleteDoc(doc(db, 'eventItems', id));
+      } catch (err) {
+        console.warn("Cloud event item delete notice:", err);
+      }
     }
   };
 
   const handleUpdateEventItem = async (updatedItem: EventItem) => {
-    if (currentUser?.id === 'u1') {
-      saveEventItems(eventItems.map(item => item.id === updatedItem.id ? updatedItem : item));
-    } else {
-      await setDoc(doc(db, 'eventItems', updatedItem.id), cleanUndefined(updatedItem));
+    saveEventItems(eventItems.map(item => item.id === updatedItem.id ? updatedItem : item));
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'eventItems', updatedItem.id), cleanUndefined(updatedItem));
+      } catch (err) {
+        console.warn("Cloud event item update notice:", err);
+      }
     }
   };
 
   // Expense Tracker Actions
   const handleAddExpenseBook = async (bookData: Omit<ExpenseBook, 'id' | 'userId' | 'createdAt'>) => {
     if (!currentUser) return;
+    const activeUid = getActiveUserId();
     const newBook: ExpenseBook = {
       ...bookData,
       id: 'eb_' + Date.now(),
-      userId: currentUser.id,
+      userId: activeUid,
       createdAt: new Date().toISOString()
     };
     
-    if (currentUser.id === 'u1') {
-      saveExpenseBooks([...expenseBooks, newBook]);
-    } else {
-      await setDoc(doc(db, 'expenseBooks', newBook.id), cleanUndefined(newBook));
+    // Always update local state immediately
+    saveExpenseBooks([newBook, ...expenseBooks]);
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'expenseBooks', newBook.id), cleanUndefined(newBook));
+      } catch (err) {
+        console.warn("Cloud expense book sync notice:", err);
+      }
     }
   };
 
   const handleUpdateExpenseBook = async (updatedBook: ExpenseBook) => {
     if (!currentUser) return;
-    
-    if (currentUser.id === 'u1') {
-      saveExpenseBooks(expenseBooks.map(b => b.id === updatedBook.id ? updatedBook : b));
-    } else {
-      await setDoc(doc(db, 'expenseBooks', updatedBook.id), cleanUndefined(updatedBook));
+    saveExpenseBooks(expenseBooks.map(b => b.id === updatedBook.id ? updatedBook : b));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'expenseBooks', updatedBook.id), cleanUndefined(updatedBook));
+      } catch (err) {
+        console.warn("Cloud expense book update notice:", err);
+      }
     }
   };
 
   const handleDeleteExpenseBook = async (id: string) => {
     if (!currentUser) return;
     
-    if (currentUser.id === 'u1') {
-      saveExpenseBooks(expenseBooks.filter(b => b.id !== id));
-      saveExpenses(expenses.filter(e => e.bookId !== id));
-    } else {
-      await deleteDoc(doc(db, 'expenseBooks', id));
-      // Delete associated expenses
-      const associatedExpenses = expenses.filter(e => e.bookId === id);
-      for (const exp of associatedExpenses) {
-        await deleteDoc(doc(db, 'expenses', exp.id));
+    saveExpenseBooks(expenseBooks.filter(b => b.id !== id));
+    saveExpenses(expenses.filter(e => e.bookId !== id));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await deleteDoc(doc(db, 'expenseBooks', id));
+        const associatedExpenses = expenses.filter(e => e.bookId === id);
+        for (const exp of associatedExpenses) {
+          await deleteDoc(doc(db, 'expenses', exp.id));
+        }
+      } catch (err) {
+        console.warn("Cloud expense book delete notice:", err);
       }
     }
   };
 
   const handleAddExpense = async (expenseData: Omit<ExpenseEntry, 'id' | 'userId' | 'createdAt'>) => {
     if (!currentUser) return;
+    const activeUid = getActiveUserId();
     const newExpense: ExpenseEntry = {
       ...expenseData,
       id: 'exp_' + Date.now(),
-      userId: currentUser.id,
+      userId: activeUid,
       createdAt: new Date().toISOString()
     };
     
-    if (currentUser.id === 'u1') {
-      saveExpenses([...expenses, newExpense]);
-    } else {
-      await setDoc(doc(db, 'expenses', newExpense.id), cleanUndefined(newExpense));
+    saveExpenses([newExpense, ...expenses]);
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'expenses', newExpense.id), cleanUndefined(newExpense));
+      } catch (err) {
+        console.warn("Cloud expense sync notice:", err);
+      }
     }
   };
 
   const handleUpdateExpense = async (updatedExpense: ExpenseEntry) => {
     if (!currentUser) return;
-    
-    if (currentUser.id === 'u1') {
-      saveExpenses(expenses.map(e => e.id === updatedExpense.id ? updatedExpense : e));
-    } else {
-      await setDoc(doc(db, 'expenses', updatedExpense.id), cleanUndefined(updatedExpense));
+    saveExpenses(expenses.map(e => e.id === updatedExpense.id ? updatedExpense : e));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await setDoc(doc(db, 'expenses', updatedExpense.id), cleanUndefined(updatedExpense));
+      } catch (err) {
+        console.warn("Cloud expense update notice:", err);
+      }
     }
   };
 
   const handleDeleteExpense = async (id: string) => {
     if (!currentUser) return;
-    
-    if (currentUser.id === 'u1') {
-      saveExpenses(expenses.filter(e => e.id !== id));
-    } else {
-      await deleteDoc(doc(db, 'expenses', id));
+    saveExpenses(expenses.filter(e => e.id !== id));
+
+    if (shouldSyncToCloud()) {
+      try {
+        await deleteDoc(doc(db, 'expenses', id));
+      } catch (err) {
+        console.warn("Cloud expense delete notice:", err);
+      }
     }
   };
 
