@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ExpenseBook, ExpenseEntry } from '../types';
 import { 
-  Plus, Search, Calendar, ArrowLeft, Trash2, Pencil, PiggyBank, 
+  Plus, Calendar, ArrowLeft, Trash2, Pencil, PiggyBank, 
   TrendingUp, TrendingDown, DollarSign, X, Filter, Clock, 
   ArrowUpRight, Check, AlertTriangle, ChevronRight, Tag, BookOpen
 } from 'lucide-react';

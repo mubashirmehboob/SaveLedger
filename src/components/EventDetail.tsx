@@ -3,7 +3,7 @@ import { EventEntity, EventItem, SimulatedContact } from '../types';
 import { translations, translatePresetName, translatePresetText } from '../utils/translations';
 import { 
   ArrowLeft, Plus, Search, Calendar, Phone, Trash2, CheckCircle2,
-  TrendingUp, TrendingDown, DollarSign, Gift, HelpCircle, Heart, Tag, Pencil
+  TrendingUp, TrendingDown, DollarSign, Gift, HelpCircle, Heart, Tag, Pencil, X
 } from 'lucide-react';
 import ContactPicker from './ContactPicker';
 
@@ -32,6 +32,7 @@ export default function EventDetail({
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeItemFilter, setActiveItemFilter] = useState<'all' | 'gift' | 'expense'>('all');
 
   // New Event Item Form State
@@ -214,7 +215,7 @@ export default function EventDetail({
           <div className="pt-3 md:pt-0 md:pl-4">
             <span className="text-[10px] uppercase font-semibold text-slate-400">{texts.giftsPahajiReceivedHeader}</span>
             <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">Rs. {totalReceivedGiftsValue.toLocaleString()}</p>
-            <span className="text-[9px] text-emerald-400">Salami contributions</span>
+            <span className="text-[9px] text-emerald-400">Gift / Salami contributions</span>
           </div>
 
           <div className="pt-3 md:pt-0 md:pl-4">
@@ -253,18 +254,42 @@ export default function EventDetail({
             <p className="text-xs text-slate-500">{texts.ceremonyLogEntriesSubtitle}</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-            {/* Search items bar */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder={texts.searchGuestsPlaceholder}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:border-emerald-500 outline-hidden w-full text-slate-800"
-              />
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Compact Search icon button / expandable search */}
+            {isSearchOpen || searchTerm ? (
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:border-emerald-500 focus:bg-white outline-hidden w-36 sm:w-44 transition-all text-slate-800"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setIsSearchOpen(false);
+                  }}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Close search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200/60 transition-all cursor-pointer shadow-3xs"
+                title="Search entries"
+                id="search-icon-btn"
+              >
+                <Search className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {/* Quick Filter tabs buttons */}
             <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -477,7 +502,7 @@ export default function EventDetail({
                         onClick={() => setShowContactPicker(true)}
                         className="text-xs text-emerald-600 hover:bg-emerald-50 px-2 rounded-sm border border-emerald-100 flex items-center gap-0.5 font-bold cursor-pointer"
                       >
-                        📖 {texts.savedContactsBtn}
+                        {texts.savedContactsBtn}
                       </button>
                     </div>
                     <input
@@ -688,7 +713,7 @@ export default function EventDetail({
                         onClick={() => setShowEditContactPicker(true)}
                         className="text-xs text-emerald-600 hover:bg-emerald-50 px-2 rounded-sm border border-emerald-100 flex items-center gap-0.5 font-bold cursor-pointer"
                       >
-                        📖 {texts.savedContactsBtn}
+                        {texts.savedContactsBtn}
                       </button>
                     </div>
                     <input

@@ -133,7 +133,7 @@ export const getInitialEvents = (userId: string): EventEntity[] => [
     type: 'Housewarming',
     date: '2026-06-20',
     plannedBudget: 45000,
-    notes: "Visiting Imran's new rawalpindi house. Recorded to match custom Pahaji settings."
+    notes: "Visiting Imran's new rawalpindi house. Recorded to match custom event settings."
   },
   {
     id: 'e2',
@@ -142,7 +142,7 @@ export const getInitialEvents = (userId: string): EventEntity[] => [
     type: 'Wedding',
     date: '2026-07-05',
     plannedBudget: 150000,
-    notes: 'Daughter wedding gift records. Must tally previous Pahaji lists.'
+    notes: 'Daughter wedding gift records. Must tally previous gift lists.'
   }
 ];
 
@@ -177,7 +177,7 @@ export const getInitialEventItems = (userId: string): EventItem[] => [
     amount: 15000,
     giftItem: 'Dinner Set (Luxury 72pc)',
     date: '2026-07-05',
-    notes: 'Gave luxury dinner set + Rs. 5000 cash as Salami/Pahaji.'
+    notes: 'Gave luxury dinner set + Rs. 5000 cash as Gift / Salami.'
   },
   {
     // Let's also simulate an event where WE are the host and received contributions from others!
@@ -189,7 +189,7 @@ export const getInitialEventItems = (userId: string): EventItem[] => [
     amount: 10000,
     giftItem: 'Cash & Microwave Oven',
     date: '2026-06-14',
-    notes: 'Received Salami / Pahaji for our son Aqeeqah.'
+    notes: 'Received Gift / Salami for our son Aqeeqah.'
   }
 ];
 
@@ -201,7 +201,7 @@ export const getHostedSimulatedEvent = (userId: string): EventEntity => ({
   type: 'Aqeeqah',
   date: '2026-06-14',
   plannedBudget: 120000,
-  notes: 'Hosted at our house. Recording all gifts (Pahaji) returned by friends and relatives!'
+  notes: 'Hosted at our house. Recording all gifts returned by friends and relatives!'
 });
 
 export const getInitialHostedEventItems = (userId: string): EventItem[] => [
@@ -214,7 +214,7 @@ export const getInitialHostedEventItems = (userId: string): EventItem[] => [
     amount: 5000,
     giftItem: 'Cash',
     date: '2026-06-14',
-    notes: 'Returned Rs. 5,000 Salami / Pahaji (We gave him Rs. 3,000 last year on his birthday).'
+    notes: 'Returned Rs. 5,000 Salami (We gave him Rs. 3,000 last year on his birthday).'
   },
   {
     id: 'ei5',

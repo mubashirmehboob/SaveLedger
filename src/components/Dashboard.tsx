@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Ledger, Transaction, EventEntity, EventItem, UserAccount } from '../types';
 import { translations, translatePresetName, translatePresetDesc } from '../utils/translations';
 import { 
-  BookOpen, Plus, Sparkles, TrendingUp, TrendingDown, Clock, Search, 
+  BookOpen, Plus, Sparkles, TrendingUp, TrendingDown, Clock, 
   Trash2, ChevronRight, FileSpreadsheet, Gift, Landmark, Calendar,
   AlertCircle, HelpCircle, ArrowRightLeft, User, Phone, LogOut, CheckCircle2
 } from 'lucide-react';
@@ -374,13 +374,12 @@ export default function Dashboard({
             {/* Premium Interactive Search Input */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 sm:justify-end">
               <div className="relative max-w-xs w-full">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
                   placeholder={language === 'urdu' ? 'کھاتہ تلاش کریں...' : language === 'hindi' ? 'बहीखाता खोजें...' : 'Search ledger books...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-hidden text-xs text-slate-800 font-bold shadow-3xs transition-all"
+                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-hidden text-xs text-slate-800 font-bold shadow-3xs transition-all"
                   id="ledger-search-input"
                 />
               </div>
@@ -859,7 +858,7 @@ export default function Dashboard({
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.eventNameLabel}</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Event Name</label>
                 <input
                   type="text"
                   required
@@ -874,7 +873,7 @@ export default function Dashboard({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Occasion Type</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Event Type</label>
                   <select
                     value={newEventType}
                     disabled={isSavingEvent}
@@ -888,7 +887,7 @@ export default function Dashboard({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Ceremony Date</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Event Date</label>
                   <input
                     type="date"
                     disabled={isSavingEvent}
@@ -916,7 +915,7 @@ export default function Dashboard({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.notesOptionalLabel}</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Organizer Notes</label>
                 <textarea
                   placeholder="Organizer notes..."
                   disabled={isSavingEvent}
@@ -951,7 +950,7 @@ export default function Dashboard({
                       <span>{language === 'urdu' ? 'محفوظ ہو رہا ہے...' : language === 'hindi' ? 'सहेजा जा रहा है...' : 'Saving...'}</span>
                     </>
                   ) : (
-                    <span>{texts.scheduleEventDiaryBtn}</span>
+                    <span>Save Event Diary</span>
                   )}
                 </button>
               </div>

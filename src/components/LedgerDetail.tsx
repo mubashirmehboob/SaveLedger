@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { Ledger, Transaction, TransactionType, SimulatedContact } from '../types';
 import { 
-  ArrowLeft, Plus, Search, Calendar, Phone, Trash2, CalendarCheck, CheckCircle2,
+  ArrowLeft, Plus, Calendar, Phone, Trash2, CalendarCheck, CheckCircle2,
   Share2, ArrowDownLeft, ArrowUpRight, PlusCircle, Smile, HelpCircle, Save, Filter,
-  User, ChevronRight, FileDown, Pencil, MessageCircle, ChevronDown
+  User, ChevronRight, FileDown, Pencil, MessageCircle, ChevronDown, Search, X
 } from 'lucide-react';
 import ContactPicker from './ContactPicker';
 import { translations, translatePresetName, translatePresetDesc, translatePresetText } from '../utils/translations';
@@ -35,6 +35,7 @@ export default function LedgerDetail({
   const [showAddTxModal, setShowAddTxModal] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'given' | 'received'>('all');
 
   // New Transaction Form State
@@ -45,7 +46,7 @@ export default function LedgerDetail({
   const [txType, setTxType] = useState<TransactionType>('Loan');
   const [txNature, setTxNature] = useState<'given' | 'received'>('given'); // 'given': lent, 'received': borrowed
   const [itemDetails, setItemDetails] = useState(''); // e.g. "Dinner Set", "Cash"
-  const [txDate, setTxDate] = useState(() => new Date().toISOString().substring(0, 16)); // YYYY-MM-DDTHH:MM
+  const [txDate, setTxDate] = useState(() => new Date().toISOString().substring(0, 10)); // YYYY-MM-DD
   const [notes, setNotes] = useState('');
 
   // Custom Transaction Types (users can create unlimited custom transaction types)
@@ -100,10 +101,14 @@ export default function LedgerDetail({
     setEditNotes(tx.notes || '');
     
     let formattedDate = tx.date;
-    if (tx.date && tx.date.length >= 16) {
-      formattedDate = tx.date.substring(0, 16);
+    if (tx.date) {
+      if (tx.date.includes('T')) {
+        formattedDate = tx.date.split('T')[0];
+      } else if (tx.date.length >= 10) {
+        formattedDate = tx.date.substring(0, 10);
+      }
     }
-    setEditTxDate(formattedDate);
+    setEditTxDate(formattedDate || new Date().toISOString().substring(0, 10));
   };
 
   const handleEditTxSubmit = (e: React.FormEvent) => {
@@ -222,7 +227,7 @@ export default function LedgerDetail({
     setTxNature('given');
     setItemDetails('');
     setNotes('');
-    setTxDate(new Date().toISOString().substring(0, 16));
+    setTxDate(new Date().toISOString().substring(0, 10));
     setShowAddTxModal(false);
   };
 
@@ -251,7 +256,7 @@ export default function LedgerDetail({
       `📦 *Entry Type:* ${tx.type}\n` +
       `📅 *Date:* ${new Date(tx.date).toLocaleDateString('en-PK')}\n` +
       `ℹ️ *Details:* ${tx.itemDetails || 'Cash record'}\n` +
-      `${tx.notes ? `📝 *Memo:* ${tx.notes}\n` : ''}\n` +
+      `${tx.notes ? `📝 *Special Reminders:* ${tx.notes}\n` : ''}\n` +
       `Status: *${tx.nature === 'given' ? 'You Received / Lent from ' + userShort() : 'You paid / Returned to ' + userShort()}*\n` +
       `Saved safely in digital SaveLedger app.`
     );
@@ -635,7 +640,7 @@ export default function LedgerDetail({
       { key: "Nature / Flow:", val: tx.nature === 'given' ? "Cash Given / Lent (+)" : "Cash Received / Borrowed (-)" },
       { key: "Date & Time:", val: new Date(tx.date).toLocaleString('en-PK', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
       { key: "Goods / Items details:", val: tx.itemDetails || "N/A (Pure Cash)" },
-      { key: "Memo / Notes:", val: tx.notes || "No remarks" }
+      { key: "Special Reminders / Notes:", val: tx.notes || "No remarks" }
     ];
 
     let currentY = 100;
@@ -836,18 +841,42 @@ export default function LedgerDetail({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-            {/* Search inputs */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search ledger entries..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:border-emerald-500 outline-hidden w-full text-slate-800"
-              />
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Compact Search icon button / expandable search */}
+            {isSearchOpen || searchTerm ? (
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Search entries..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:border-emerald-500 focus:bg-white outline-hidden w-36 sm:w-44 transition-all text-slate-800"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setIsSearchOpen(false);
+                  }}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Close search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200/60 transition-all cursor-pointer shadow-3xs"
+                title="Search ledger entries"
+                id="ledger-search-icon-btn"
+              >
+                <Search className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {/* Quick Filters */}
             <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -1439,7 +1468,7 @@ export default function LedgerDetail({
               {/* Mobile and WhatsApp Contacts */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{language === 'urdu' ? 'موبائل نمبر (اختیاری)' : language === 'hindi' ? 'मोबाइल नंबर (वैकल्पिक)' : 'Mobile No (Optional)'}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile No</label>
                   <input
                     type="text"
                     placeholder="e.g. +92 300 1234567"
@@ -1450,7 +1479,7 @@ export default function LedgerDetail({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.whatsAppNotificationSub}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">WhatsApp No</label>
                   <input
                     type="text"
                     placeholder="e.g. +92 300 1234567"
@@ -1464,7 +1493,7 @@ export default function LedgerDetail({
               {/* Amount and Instrument details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.amountPkrLabel}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Amount</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rs.</span>
                     <input
@@ -1480,7 +1509,7 @@ export default function LedgerDetail({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.whatWasGivenLabel}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">What was given?</label>
                   <input
                     type="text"
                     placeholder="e.g. Pure Cash, Tea Set, Dinner Set, Clock"
@@ -1510,7 +1539,7 @@ export default function LedgerDetail({
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="e.g. Salami, Catering, Plumbing, Cement"
+                      placeholder="e.g. Gift / Salami, Catering, Plumbing, Cement"
                       value={newCustomType}
                       onChange={(e) => setNewCustomType(e.target.value)}
                       className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 outline-hidden text-slate-800"
@@ -1527,17 +1556,17 @@ export default function LedgerDetail({
                   <div className="flex flex-wrap gap-1 border border-slate-100 bg-slate-50 p-2 rounded-xl">
                     {customTxTypes.map(type => {
                       // Translate key custom types if standard
-                      let displayedType = type;
+                      let displayedType = type === 'Gift' || type === 'Contribution' ? 'Gift / Salami' : type;
                       if (language === 'urdu') {
                         const mapper: Record<string, string> = {
-                          'Loan': 'قرض دینا', 'Borrow': 'قرض لینا', 'Return': 'واپسی', 'Cash': 'نقد', 'Gift': 'تحفہ', 'Contribution': 'حصہ', 'Expense': 'خرچہ'
+                          'Loan': 'قرض دینا', 'Borrow': 'قرض لینا', 'Return': 'واپسی', 'Cash': 'نقد', 'Gift': 'گفٹ / سلامی', 'Contribution': 'گفٹ / سلامی', 'Expense': 'خرچہ'
                         };
-                        displayedType = mapper[type] || type;
+                        displayedType = mapper[type] || displayedType;
                       } else if (language === 'hindi') {
                         const mapper: Record<string, string> = {
-                          'Loan': 'ऋण देय', 'Borrow': 'ऋण प्राप्त', 'Return': 'वापसी', 'Cash': 'नकद', 'Gift': 'उपहार', 'Contribution': 'योगदान', 'Expense': 'व्यय'
+                          'Loan': 'ऋण देय', 'Borrow': 'ऋण प्राप्त', 'Return': 'वापसी', 'Cash': 'नकद', 'Gift': 'उपहार / सलामी', 'Contribution': 'उपहार / सलामी', 'Expense': 'व्यय'
                         };
-                        displayedType = mapper[type] || type;
+                        displayedType = mapper[type] || displayedType;
                       }
                       return (
                         <button
@@ -1560,9 +1589,9 @@ export default function LedgerDetail({
 
               {/* Date of transaction */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.entryTimestampLabel}</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Entry Date</label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   required
                   value={txDate}
                   onChange={(e) => setTxDate(e.target.value)}
@@ -1573,7 +1602,7 @@ export default function LedgerDetail({
 
               {/* Memo/Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.memoRemindersDescLabel}</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Reminders description</label>
                 <textarea
                   placeholder={texts.memoRemindersDescPlaceholder}
                   value={notes}
@@ -1597,7 +1626,7 @@ export default function LedgerDetail({
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
                   id="add-tx-entry-submit"
                 >
-                  {texts.saveEntryBookRecordBtn}
+                  Save Entry
                 </button>
               </div>
             </form>
@@ -1752,17 +1781,17 @@ export default function LedgerDetail({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">{language === 'urdu' ? 'کیٹیگری / ٹیگ' : language === 'hindi' ? 'श्रेणी / टैग' : 'Entry Category / Tag'}</label>
                 <div className="flex flex-wrap gap-1 border border-slate-100 bg-slate-50 p-2 rounded-xl">
                   {customTxTypes.map(type => {
-                    let displayedType = type;
+                    let displayedType = type === 'Gift' || type === 'Contribution' ? 'Gift / Salami' : type;
                     if (language === 'urdu') {
                       const mapper: Record<string, string> = {
-                        'Loan': 'قرض دینا', 'Borrow': 'قرض لینا', 'Return': 'واپسی', 'Cash': 'نقد', 'Gift': 'تحفہ', 'Contribution': 'حصہ', 'Expense': 'خرچہ'
+                        'Loan': 'قرض دینا', 'Borrow': 'قرض لینا', 'Return': 'واپسی', 'Cash': 'نقد', 'Gift': 'گفٹ / سلامی', 'Contribution': 'گفٹ / سلامی', 'Expense': 'خرچہ'
                       };
-                      displayedType = mapper[type] || type;
+                      displayedType = mapper[type] || displayedType;
                     } else if (language === 'hindi') {
                       const mapper: Record<string, string> = {
-                        'Loan': 'ऋण देय', 'Borrow': 'ऋण प्राप्त', 'Return': 'वापसी', 'Cash': 'नकद', 'Gift': 'उपहार', 'Contribution': 'योगदान', 'Expense': 'व्यय'
+                        'Loan': 'ऋण देय', 'Borrow': 'ऋण प्राप्त', 'Return': 'वापसी', 'Cash': 'नकद', 'Gift': 'उपहार / सलामी', 'Contribution': 'उपहार / सलामी', 'Expense': 'व्यय'
                       };
-                      displayedType = mapper[type] || type;
+                      displayedType = mapper[type] || displayedType;
                     }
                     return (
                       <button
@@ -1784,9 +1813,9 @@ export default function LedgerDetail({
 
               {/* Date of transaction */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{texts.entryTimestampLabel}</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Entry Date</label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   required
                   value={editTxDate}
                   onChange={(e) => setEditTxDate(e.target.value)}
@@ -1794,9 +1823,9 @@ export default function LedgerDetail({
                 />
               </div>
 
-              {/* Memo/Description */}
+              {/* Notes/Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">{language === 'urdu' ? 'تفصیل / یاد دہانی نوٹ' : language === 'hindi' ? 'मेमो विवरण' : 'Memo description'}</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{language === 'urdu' ? 'تفصیل / یاد دہانی نوٹ' : language === 'hindi' ? 'विवरण / अनुस्मारक नोट' : 'Special Reminders note'}</label>
                 <textarea
                   placeholder="e.g., Return promise or advance payment details..."
                   value={editNotes}

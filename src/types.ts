@@ -65,7 +65,7 @@ export interface EventItem {
   id: string;
   eventId: string;
   userId: string;
-  type: 'gift' | 'expense'; // 'gift' is contribution/Pahaji received; 'expense' is money spent
+  type: 'gift' | 'expense'; // 'gift' is contribution/gift received; 'expense' is money spent
   personName?: string; // Guests name if type is 'gift'
   personMobile?: string;
   personWhatsApp?: string;

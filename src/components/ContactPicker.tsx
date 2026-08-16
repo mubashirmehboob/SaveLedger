@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SIMULATED_CONTACTS } from '../utils/dummyData';
 import { SimulatedContact } from '../types';
-import { Search, User, Phone, Check, Upload, Plus, Smartphone, BookOpen, Trash2 } from 'lucide-react';
+import { User, Phone, Check, Upload, Plus, Smartphone, BookOpen, Trash2, MessageCircle, FileText, Sparkles } from 'lucide-react';
 import { translations } from '../utils/translations';
 
 interface ContactPickerProps {
@@ -18,12 +18,15 @@ export default function ContactPicker({
   language = 'english' 
 }: ContactPickerProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'search' | 'add' | 'vcf'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'whatsapp' | 'add' | 'vcf'>('search');
   
   // Local states for custom manual contact addition
   const [newName, setNewName] = useState('');
   const [newMobile, setNewMobile] = useState('');
   const [newWhatsApp, setNewWhatsApp] = useState('');
+
+  // WhatsApp quick paste text state
+  const [whatsappPasteText, setWhatsappPasteText] = useState('');
 
   // Load custom contacts from localStorage
   const [customContacts, setCustomContacts] = useState<SimulatedContact[]>(() => {
@@ -95,6 +98,102 @@ export default function ContactPicker({
     return contacts;
   };
 
+  // Helper function to parse WhatsApp contact paste text
+  const parseWhatsAppPastedText = (rawText: string): SimulatedContact[] => {
+    const lines = rawText.split(/\r?\n/);
+    const parsedList: SimulatedContact[] = [];
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // Extract phone number patterns (e.g. +92 300 1234567, 0300-1234567, +91..., etc.)
+      const phoneRegex = /(\+?\d[\d\s\-\(\)]{8,16}\d)/;
+      const phoneMatch = trimmed.match(phoneRegex);
+
+      if (phoneMatch) {
+        const foundPhone = phoneMatch[1].trim();
+        // The remaining text is considered the name
+        let foundName = trimmed.replace(foundPhone, '').replace(/[:,\-\–\|]/g, ' ').trim();
+        if (!foundName || foundName.length < 2) {
+          foundName = `WhatsApp Contact ${idx + 1}`;
+        }
+
+        parsedList.push({
+          id: `wa_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+          name: foundName,
+          mobile: foundPhone,
+          whatsapp: foundPhone
+        });
+      } else if (trimmed.length >= 3) {
+        // Line without obvious phone - check if it's name: number
+        const parts = trimmed.split(/[:=\t]/);
+        if (parts.length >= 2) {
+          const namePart = parts[0].trim();
+          const numPart = parts[1].trim();
+          if (numPart.replace(/\D/g, '').length >= 7) {
+            parsedList.push({
+              id: `wa_${Date.now()}_${idx}`,
+              name: namePart,
+              mobile: numPart,
+              whatsapp: numPart
+            });
+          }
+        }
+      }
+    });
+
+    return parsedList;
+  };
+
+  const handleWhatsAppImportSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!whatsappPasteText.trim()) {
+      alert(language === 'urdu' ? 'برائے مہربانی واٹس ایپ کاپی شدہ متن یا نمبر پیسٹ کریں۔' : 'Please paste WhatsApp text or contact numbers.');
+      return;
+    }
+
+    const parsed = parseWhatsAppPastedText(whatsappPasteText);
+    if (parsed.length === 0) {
+      alert(
+        language === 'urdu'
+          ? 'متن میں کوئی فون نمبر نہیں ملا۔ براہ کرم نام اور نمبر درست انداز میں پیسٹ کریں۔ (مثال: Zeeshan: 03001234567)'
+          : 'No valid phone numbers detected. Please paste text with phone numbers (e.g. Zeeshan: +92 300 1234567).'
+      );
+      return;
+    }
+
+    const merged = [...parsed, ...customContacts];
+    const uniqueContacts: SimulatedContact[] = [];
+    const seenNumbers = new Set<string>();
+
+    merged.forEach(contact => {
+      const cleanPhone = contact.mobile.replace(/[\s\-\(\)\+\+]/g, '');
+      if (!seenNumbers.has(cleanPhone)) {
+        seenNumbers.add(cleanPhone);
+        uniqueContacts.push(contact);
+      }
+    });
+
+    setCustomContacts(uniqueContacts);
+    localStorage.setItem('saveledger_custom_contacts', JSON.stringify(uniqueContacts));
+    
+    // If only 1 contact was pasted, select it immediately
+    if (parsed.length === 1) {
+      onSelect(parsed[0]);
+      onClose();
+      return;
+    }
+
+    alert(
+      language === 'urdu'
+        ? `${parsed.length} واٹس ایپ روابط کامیابی سے شامل ہو گئے۔`
+        : `Successfully imported ${parsed.length} WhatsApp contacts!`
+    );
+    setWhatsappPasteText('');
+    setActiveTab('search');
+  };
+
   // Import contacts from vCard file upload
   const handleVCFUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -158,7 +257,7 @@ export default function ContactPicker({
           ? 'اس ڈیوائس پر کانٹیکٹس تک رسائی دستیاب نہیں ہے۔\n\nآپ درج ذیل طریقے استعمال کر سکتے ہیں:\n• کانٹیکٹ نمبر خود درج کریں\n• فائل (.vcf) سے کانٹیکٹس امپورٹ کریں\n\nبراہِ راست فون بک تک رسائی کے لیے، SaveLedger کو کسی سپورٹڈ موبائل ڈیوائس پر کھولیں۔'
           : language === 'hindi'
           ? 'इस डिवाइस पर संपर्कों (Contacts) तक पहुंच उपलब्ध नहीं है।\n\nआप निम्न तरीके अपना सकते हैं:\n• मैन्युअल रूप से संपर्क जोड़ें\n• .vcf फ़ाइल से संपर्क आयात (Import) करें\n\nसीधे फोन बुक उपयोग के लिए, किसी समर्थित मोबाइल डिवाइस पर SaveLedger खोलें।'
-          : 'Contacts access is not available on this device.\n\nYou can:\n• Add a contact manually\n• Import contacts from a .vcf file\n\nFor direct contact access, open SaveLedger on a supported mobile device.'
+          : 'Contacts access is not available on this device.\n\nYou can:\n• Add a contact manually\n• Paste WhatsApp contact text\n• Import contacts from a .vcf file\n\nFor direct contact access, open SaveLedger on a supported mobile device.'
       );
       return;
     }
@@ -204,7 +303,7 @@ export default function ContactPicker({
           ? 'فون بک تک رسائی کی اجازت نہیں ملی۔ سیکیورٹی اور آئی فریم (iFrame) کی حدود کی وجہ سے براؤزر اکثر اسے بلاک کرتا ہے۔ برائے مہربانی مینوئل نمبر لکھیں یا VCF فائل اپ لوڈ کریں۔'
           : language === 'hindi'
           ? 'फ़ोन बुक एक्सेस की अनुमति नहीं मिली (iFrame या सुरक्षा कारणों से)। कृपया मैन्युअल रूप से जोड़ें या .vcf फ़ाइल का उपयोग करें।'
-          : 'Access to device contacts was rejected or restricted (often blocked inside safe sandboxed iFrame containers). Please use "Add Custom Contact" or "Upload Contacts File"!'
+          : 'Access to device contacts was rejected or restricted. Please use "WhatsApp Contacts" paste or "Add Custom Contact"!'
       );
     }
   };
@@ -228,18 +327,8 @@ export default function ContactPicker({
     setCustomContacts(updatedCustom);
     localStorage.setItem('saveledger_custom_contacts', JSON.stringify(updatedCustom));
 
-    alert(
-      language === 'urdu'
-        ? 'نیا رابطہ فہرست میں کامیابی سے شامل کر دیا گیا ہے۔'
-        : language === 'hindi'
-        ? 'नया संपर्क सूची में सफलतापूर्वक जोड़ा गया है।'
-        : 'Custom contact saved to your directory successfully!'
-    );
-
-    setNewName('');
-    setNewMobile('');
-    setNewWhatsApp('');
-    setActiveTab('search');
+    onSelect(newItem);
+    onClose();
   };
 
   // Delete custom contact helper
@@ -256,7 +345,8 @@ export default function ContactPicker({
   const allContacts = [...customContacts, ...SIMULATED_CONTACTS];
   const filteredContacts = allContacts.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.mobile.includes(searchTerm)
+    c.mobile.includes(searchTerm) ||
+    (c.whatsapp && c.whatsapp.includes(searchTerm))
   ).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -265,15 +355,15 @@ export default function ContactPicker({
         
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-emerald-600 text-white">
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold text-lg flex items-center gap-2">
-              <Phone className="w-5 h-5 text-emerald-100 animate-pulse" />
+              <MessageCircle className="w-5 h-5 text-emerald-100" />
               <span>
                 {language === 'urdu' 
-                  ? 'فون بک اور واٹس ایپ کانٹیکٹس' 
+                  ? 'واٹس ایپ اور فون رابطے' 
                   : language === 'hindi' 
-                  ? 'फ़ोन बुक और व्हाट्सएप संपर्क' 
-                  : 'Phone Book & WhatsApp Contacts'}
+                  ? 'व्हाट्सएप और फोन संपर्क' 
+                  : 'WhatsApp & Phone Contacts'}
               </span>
             </h3>
             <button
@@ -286,26 +376,26 @@ export default function ContactPicker({
           </div>
           <p className="text-emerald-100 text-xs leading-relaxed">
             {language === 'urdu' 
-              ? 'موبائل فون، واٹس ایپ یا گیلری برآمد شدہ فائل سے روابط اٹھائیں، یا نیا کسٹمر شامل کریں۔' 
+              ? 'واٹس ایپ، فون بک یا بیک اپ فائل سے رابطہ منتخب کریں یا نیا رابطہ درج کریں۔' 
               : language === 'hindi' 
-              ? 'मोबाइल फोन, व्हाट्सएप या गैलरी आयात फ़ाइल से संपर्क चुनें।' 
-              : 'Pick contacts from your phone directory, upload exported .vcf backup cards, or save custom entry.'}
+              ? 'व्हाट्सएप, फोन बुक या बैकअप फ़ाइल से संपर्क चुनें।' 
+              : 'Pick directly from your WhatsApp contacts, phone book, paste text, or upload .vcf card.'}
           </p>
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500">
+        <div className="flex border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('search')}
-            className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 min-w-[90px] py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'search'
                 ? 'border-emerald-600 text-emerald-600 bg-white'
                 : 'border-transparent hover:text-slate-800'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>{language === 'urdu' ? 'رابطہ سرچ فہرست' : language === 'hindi' ? 'सूची खोजें' : 'Search Contacts'}</span>
+            <span>{language === 'urdu' ? 'رابطے' : 'Contacts'}</span>
             <span className="bg-emerald-50 text-emerald-700 rounded-full px-1.5 py-0.2 text-[10px]">
               {allContacts.length}
             </span>
@@ -313,28 +403,41 @@ export default function ContactPicker({
 
           <button
             type="button"
+            onClick={() => setActiveTab('whatsapp')}
+            className={`flex-1 min-w-[110px] py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1 cursor-pointer ${
+              activeTab === 'whatsapp'
+                ? 'border-emerald-600 text-emerald-600 bg-white'
+                : 'border-transparent hover:text-slate-800'
+            }`}
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{language === 'urdu' ? 'واٹس ایپ' : language === 'hindi' ? 'व्हाट्सएप' : 'WhatsApp'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('add')}
-            className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 min-w-[80px] py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'add'
                 ? 'border-emerald-600 text-emerald-600 bg-white'
                 : 'border-transparent hover:text-slate-800'
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{language === 'urdu' ? 'نیا نمبر درج کریں' : language === 'hindi' ? 'नया जोड़ें' : 'Add Custom'}</span>
+            <span>{language === 'urdu' ? 'نیا' : 'Add'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('vcf')}
-            className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 min-w-[80px] py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'vcf'
                 ? 'border-emerald-600 text-emerald-600 bg-white'
                 : 'border-transparent hover:text-slate-800'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>{language === 'urdu' ? 'فائل اپ لوڈ' : language === 'hindi' ? 'फ़ाइल अपलोड' : 'Upload VCF'}</span>
+            <span>VCF File</span>
           </button>
         </div>
 
@@ -342,15 +445,14 @@ export default function ContactPicker({
         {activeTab === 'search' && (
           <>
             {/* Search Bar & Native API Access Button */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-2.5">
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder={texts.searchContactsPlaceholder}
+                  placeholder={language === 'urdu' ? 'نام یا واٹس ایپ نمبر تلاش کریں...' : 'Search name or WhatsApp number...'}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-hidden transition-all text-slate-800 font-sans"
+                  className="w-full px-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-hidden transition-all text-slate-800 font-sans"
                   id="contact-search-input"
                   autoFocus
                 />
@@ -363,7 +465,7 @@ export default function ContactPicker({
                 className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs py-2 px-3 rounded-xl border border-emerald-200/80 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Smartphone className="w-4 h-4 text-emerald-700" />
-                <span>{language === 'urdu' ? 'فون بک سے نام منتخب کریں (موبائل ٹیسٹ)' : language === 'hindi' ? 'फ़ोन बुक से चुनें' : 'Choose Directly from Phone Address Book'}</span>
+                <span>{language === 'urdu' ? 'فون بک / واٹس ایپ سے منتخب کریں' : 'Choose Directly from Device Contacts'}</span>
               </button>
             </div>
 
@@ -371,8 +473,8 @@ export default function ContactPicker({
             <div className="overflow-y-auto flex-1 divide-y divide-slate-100 max-h-[45vh]">
               {filteredContacts.length > 0 ? (
                 filteredContacts.map(contact => {
-                  const isSelected = selectedMobile === contact.mobile;
-                  const isCustom = contact.id.startsWith('manual_') || contact.id.startsWith('vcf_') || contact.id.startsWith('native_');
+                  const isSelected = selectedMobile === contact.mobile || selectedMobile === contact.whatsapp;
+                  const isCustom = contact.id.startsWith('manual_') || contact.id.startsWith('vcf_') || contact.id.startsWith('native_') || contact.id.startsWith('wa_');
                   
                   return (
                     <div
@@ -393,15 +495,19 @@ export default function ContactPicker({
                         <div>
                           <div className="flex items-center gap-1.5">
                             <h4 className="font-extrabold text-slate-800 text-sm leading-tight">{contact.name}</h4>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
+                              <MessageCircle className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>WhatsApp</span>
+                            </span>
                             {isCustom && (
                               <span className="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-semibold font-sans">
-                                {contact.id.startsWith('vcf_') ? 'VCF' : contact.id.startsWith('native_') ? 'Phone' : 'Custom'}
+                                {contact.id.startsWith('wa_') ? 'WhatsApp' : contact.id.startsWith('vcf_') ? 'VCF' : contact.id.startsWith('native_') ? 'Phone' : 'Custom'}
                               </span>
                             )}
                           </div>
                           <p className="text-slate-500 text-xs flex items-center gap-1 mt-1 font-mono">
                             <Phone className="w-3 h-3 text-slate-400" />
-                            <span>{contact.mobile}</span>
+                            <span>{contact.whatsapp || contact.mobile}</span>
                           </p>
                         </div>
                       </div>
@@ -418,9 +524,9 @@ export default function ContactPicker({
                               onSelect(contact);
                               onClose();
                             }}
-                            className="text-xs text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-sm cursor-pointer shrink-0 border border-emerald-100"
+                            className="text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg cursor-pointer shrink-0 border border-emerald-200"
                           >
-                            {language === 'urdu' ? 'منتخب کریں' : language === 'hindi' ? 'चुनें' : 'Select'}
+                            {language === 'urdu' ? 'منتخب کریں' : 'Select'}
                           </button>
                         )}
 
@@ -444,8 +550,8 @@ export default function ContactPicker({
                   <p className="text-sm font-semibold">{language === 'urdu' ? `کوئی رابطہ نہیں ملا: "${searchTerm}"` : `No contacts found matching "${searchTerm}"`}</p>
                   <p className="text-xs text-slate-400 mt-1">
                     {language === 'urdu' 
-                      ? 'امپورٹ کرنے کے لیے فائل اپ لوڈ ٹیب میں جائیں۔' 
-                      : 'Switch tabs to type manually or upload your contacts.'}
+                      ? 'واٹس ایپ سے کاپی کر کے پیسٹ کرنے کیلئے اوپر "WhatsApp" ٹیب منتخب کریں۔' 
+                      : 'Switch to "WhatsApp" tab to paste copied contacts directly!'}
                   </p>
                 </div>
               )}
@@ -453,7 +559,51 @@ export default function ContactPicker({
           </>
         )}
 
-        {/* TAB 2: ADD CUSTOM CONTACT */}
+        {/* TAB 2: WHATSAPP QUICK PASTE & IMPORT */}
+        {activeTab === 'whatsapp' && (
+          <form onSubmit={handleWhatsAppImportSubmit} className="p-5 space-y-4 bg-white flex-1 overflow-y-auto">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
+              <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-emerald-900 leading-relaxed">
+                <p className="font-bold mb-0.5">
+                  {language === 'urdu' ? 'واٹس ایپ سے نمبر اور نام کاپی کر کے یہاں پیسٹ کریں' : 'Paste contacts directly from WhatsApp'}
+                </p>
+                <p className="text-emerald-700 text-[11px]">
+                  {language === 'urdu'
+                    ? 'آپ واٹس ایپ چیٹ یا شیئر کیے گئے کانٹیکٹ سے ٹیکسٹ یہاں پیسٹ کر سکتے ہیں۔ یہ خود بخود نام اور نمبر الگ کر لے گا۔'
+                    : 'Paste any WhatsApp message, contact card, or list of numbers (e.g. "Ali: +92 300 1234567" or "+923001234567").'}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                {language === 'urdu' ? 'واٹس ایپ ٹیکسٹ یا رابطہ نمبر پیسٹ کریں:' : 'Paste WhatsApp Contact(s) or Numbers:'}
+              </label>
+              <textarea
+                rows={5}
+                required
+                placeholder={
+                  "Examples:\n• +92 300 1234567 - Zeeshan Ali\n• Muhammad Bilal: 03219876543\n• 0300 1234567"
+                }
+                value={whatsappPasteText}
+                onChange={(e) => setWhatsappPasteText(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:bg-white outline-hidden text-slate-800 font-mono leading-relaxed"
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>{language === 'urdu' ? 'واٹس ایپ رابطہ امپورٹ اور منتخب کریں' : 'Import & Add WhatsApp Contact'}</span>
+            </button>
+          </form>
+        )}
+
+        {/* TAB 3: ADD CUSTOM CONTACT */}
         {activeTab === 'add' && (
           <form onSubmit={handleManualAdd} className="p-5 space-y-4 bg-white flex-1 overflow-y-auto">
             <div>
@@ -502,13 +652,13 @@ export default function ContactPicker({
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
               >
-                💾 {language === 'urdu' ? 'رابطہ محفوظ کریں' : language === 'hindi' ? 'सहेजें' : 'Save Contact inside App Directory'}
+                💾 {language === 'urdu' ? 'رابطہ محفوظ اور منتخب کریں' : 'Save & Select Contact'}
               </button>
             </div>
           </form>
         )}
 
-        {/* TAB 3: IMPORT VCF FILE */}
+        {/* TAB 4: IMPORT VCF FILE */}
         {activeTab === 'vcf' && (
           <div className="p-6 bg-white space-y-5 flex-1 overflow-y-auto">
             <div className="text-center space-y-2">
@@ -520,8 +670,8 @@ export default function ContactPicker({
               </h4>
               <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
                 {language === 'urdu' 
-                  ? 'اپنے موبائل گیلری / فون بک سے روابط برآمد (Export) کریں اور حاصل کردہ .vcf فائل یہاں اپ لوڈ کریں تاکہ سارا ریکارڈ مل سکے۔' 
-                  : 'Go to your phone’s original Contacts App, click details, choose "Share Contacts" or "Export Contacts" as .vcf / vCard card, and upload it here.'}
+                  ? 'اپنے موبائل گیلری / فون بک یا واٹس ایپ سے روابط برآمد (Export) کریں اور حاصل کردہ .vcf فائل یہاں اپ لوڈ کریں۔' 
+                  : 'Go to your phone contacts or WhatsApp export, share/export as .vcf or vCard file, and upload it here.'}
               </p>
             </div>
 
@@ -547,10 +697,11 @@ export default function ContactPicker({
         {/* Footer info tip card */}
         <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
           <p className="text-[10px] text-slate-400 font-sans">
-            🔒 Imported contacts are securely processed in your browser and are never uploaded to foreign external tracking services.
+            🔒 Imported contacts are securely stored in your local browser and automatically fill party name, mobile, and WhatsApp number.
           </p>
         </div>
       </div>
     </div>
   );
 }
+

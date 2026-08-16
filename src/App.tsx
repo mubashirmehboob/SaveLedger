@@ -1852,7 +1852,7 @@ export default function App() {
                                 'ٹرسٹ بک کی آفیشل لائیو ڈیٹا پالیسی کے مطابق آپ کے کسٹمر کھاتے، بلوں کا حساب، ادھار ریکارڈ اور شادی بیاہ سلامی ڈائری مکمل طور پر محفوظ کلاؤڈ ڈیٹا بیس میں رکھے جاتے ہیں۔' : 
                                 language === 'hindi' ? 
                                 'ट्रस्ट बुक की आधिकारिक लाइव नीति आपके सभी ग्राहक खातों, ऋण बहीखाता विवरण और समारोह सलामी उपहारों को पूर्ण गोपनीयता के साथ गूगल क्लाउड पर सुरक्षित रखती है।' : 
-                                'Under our official Live Data Policy, all customer sheet ledgers, financial loans, transaction memos, and ceremonial wedding Salami/Pahaji gift registers are locked in a privately encrypted Cloud Database.'}
+                                'Under our official Live Data Policy, all customer sheet ledgers, financial loans, transaction memos, and ceremonial wedding Salami/gift registers are locked in a privately encrypted Cloud Database.'}
                             </p>
                           </div>
                         </div>
